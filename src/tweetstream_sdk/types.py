@@ -56,7 +56,6 @@ MessageOperation: TypeAlias = Literal[
     "content",
     "meta",
     "update",
-    "delete",
     "profile_update",
     "follow",
     "auth_ping",
@@ -178,11 +177,6 @@ class TweetUpdate:
     text: str | None = None
     media: list[Media] = field(default_factory=list)
     ref: TweetReference | None = None
-
-
-@dataclass
-class TweetDelete:
-    tweet_id: str
 
 
 @dataclass

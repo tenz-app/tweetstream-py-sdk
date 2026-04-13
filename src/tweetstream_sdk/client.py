@@ -31,7 +31,6 @@ from .types import (
     ReferenceType,
     TweetAuthor,
     TweetContent,
-    TweetDelete,
     TweetMeta,
     TweetReference,
     TweetUpdate,
@@ -144,7 +143,6 @@ class TweetStreamClient:
             - tweet: New tweet (content: TweetContent)
             - tweet_meta: Tweet metadata (meta: TweetMeta)
             - tweet_update: Tweet updated (update: TweetUpdate)
-            - tweet_delete: Tweet deleted (data: TweetDelete)
             - profile_update: Profile changed (event: ProfileUpdateEvent)
             - follow: Follow event (event: FollowEvent)
             - reconnecting: Reconnecting (attempt: int, delay: float)
@@ -298,9 +296,6 @@ class TweetStreamClient:
                 case "update":
                     update = self._parse_tweet_update(payload)
                     await self._emit("tweet_update", update)
-                case "delete":
-                    delete = TweetDelete(tweet_id=payload.get("tweetId", ""))
-                    await self._emit("tweet_delete", delete)
                 case "profile_update":
                     event = self._parse_profile_update(payload)
                     await self._emit("profile_update", event)

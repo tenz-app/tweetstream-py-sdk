@@ -199,15 +199,75 @@ asyncio.run(main())
 ### Profile Change Monitor
 
 ```python
+from tweetstream_sdk import ProfileUpdateEvent
+
 @client.on("profile_update")
 async def on_profile(event: ProfileUpdateEvent):
     print(f"@{event.actor.handle} updated their profile:")
     if event.changes.name:
-        print(f"  Name: {event.changes.name}")
+        print(f"  Name: {event.previous.name if event.previous else '?'} -> {event.changes.name}")
     if event.changes.bio:
         print(f"  Bio: {event.changes.bio}")
+    if event.changes.avatar:
+        print(f"  New avatar: {event.changes.avatar}")
     if event.changes.handle and event.previous:
-        print(f"  Handle: @{event.previous.handle} -> @{event.changes.handle}")
+        print(f"  Handle changed: @{event.previous.handle} -> @{event.changes.handle}")
+```
+
+### Follow Event Monitor
+
+```python
+from tweetstream_sdk import FollowEvent
+
+@client.on("follow")
+async def on_follow(event: FollowEvent):
+    print(f"@{event.actor.handle} followed @{event.target.handle}")
+    print(f"  {event.actor.name} ({event.actor.followers_count} followers)")
+    print(f"  Now following: {event.target.name}")
+```
+
+### Tweet Edit Tracking
+
+```python
+from tweetstream_sdk import TweetUpdate
+
+@client.on("tweet_update")
+async def on_update(update: TweetUpdate):
+    print(f"Tweet {update.tweet_id} was edited:")
+    if update.text:
+        print(f"  New text: {update.text}")
+    if update.media:
+        print(f"  Media updated: {len(update.media)} items")
+```
+
+### Handling Quotes, Replies, and Retweets
+
+```python
+@client.on("tweet")
+async def on_tweet(tweet: TweetContent):
+    if tweet.ref:
+        match tweet.ref.type:
+            case ReferenceType.REPLY:
+                print(f"@{tweet.author.handle} replied to @{tweet.ref.author.handle}:")
+                print(f"  Original: {tweet.ref.text}")
+                print(f"  Reply: {tweet.text}")
+            case ReferenceType.QUOTE:
+                print(f"@{tweet.author.handle} quoted @{tweet.ref.author.handle}:")
+                print(f"  Quoted: {tweet.ref.text}")
+                print(f"  Comment: {tweet.text}")
+            case ReferenceType.RETWEET:
+                print(f"@{tweet.author.handle} retweeted @{tweet.ref.author.handle}")
+```
+
+### Multi-Platform Streaming (Twitter + Truth Social)
+
+```python
+from tweetstream_sdk import Platform
+
+@client.on("tweet")
+async def on_tweet(tweet: TweetContent):
+    platform = "Truth Social" if tweet.author.platform == Platform.TRUTH_SOCIAL else "Twitter/X"
+    print(f"[{platform}] @{tweet.author.handle}: {tweet.text}")
 ```
 
 ## API Reference
@@ -225,13 +285,15 @@ async def on_profile(event: ProfileUpdateEvent):
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `tweet` | `TweetContent` | New tweet received |
-| `tweet_meta` | `TweetMeta` | Token/CEX/prediction detection |
-| `profile_update` | `ProfileUpdateEvent` | Profile changed |
-| `follow` | `FollowEvent` | Follow event detected |
+| `tweet` | `TweetContent` | New tweet (includes replies, quotes, retweets) |
+| `tweet_meta` | `TweetMeta` | Token/CEX/prediction market detection, OCR |
+| `tweet_update` | `TweetUpdate` | Tweet was edited |
+| `profile_update` | `ProfileUpdateEvent` | Profile name/bio/avatar changed |
+| `follow` | `FollowEvent` | Account followed another account |
 | `connected` | - | WebSocket connected |
 | `disconnected` | `(code, reason)` | WebSocket disconnected |
 | `reconnecting` | `(attempt, delay)` | Attempting reconnection |
+| `message` | `Envelope` | Raw envelope (for advanced use) |
 
 ### TweetStreamApi
 
