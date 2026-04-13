@@ -21,7 +21,7 @@ from .types import (
     MessageType,
 )
 
-DEFAULT_API_URL = "https://api.tweetstream.io"
+DEFAULT_API_URL = "https://tweetstream.io"
 
 
 class TweetStreamApiError(Exception):
@@ -175,6 +175,7 @@ class TweetStreamApi:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
+            "User-Agent": "TweetStream-SDK/1.0 Python",
         }
 
         request_body = json.dumps(body).encode("utf-8") if body else None
