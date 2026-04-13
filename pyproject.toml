@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tweetstream-sdk"
+version = "1.0.0"
+description = "Official Python SDK for TweetStream - Real-time Twitter/X and Truth Social streaming API"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "TweetStream" }
+]
+keywords = [
+    "twitter",
+    "x",
+    "truth-social",
+    "streaming",
+    "websocket",
+    "real-time",
+    "api",
+    "sdk",
+    "crypto",
+    "trading",
+    "tweets",
+    "social-media",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "websockets>=12.0",
+]
+
+[project.urls]
+Homepage = "https://tweetstream.io"
+Documentation = "https://tweetstream.io/docs"
+Repository = "https://github.com/tenz/tweetstream-py-sdk"
+Issues = "https://github.com/tenz/tweetstream-py-sdk/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tweetstream_sdk"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+]
