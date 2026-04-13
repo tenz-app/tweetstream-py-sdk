@@ -25,6 +25,8 @@ pip install tweetstream-sdk
 uv add tweetstream-sdk
 ```
 
+Works in Python 3.10+ and includes the dependencies used by the bundled webhook examples.
+
 ## Quick Start
 
 ### Real-time Tweet Streaming
@@ -63,6 +65,7 @@ from tweetstream_sdk import TweetStreamApi
 api = TweetStreamApi(api_key="your-api-key")
 
 # Fetch historical tweets for backtesting
+# Requires an active Elite or Enterprise subscription
 history = api.get_history(
     handles=["elonmusk", "VitalikButerin"],
     limit=100,
@@ -137,6 +140,8 @@ tweets = api.get_history(
     limit=500,
 )
 ```
+
+`get_history(...)` is currently available for users on an active Elite or Enterprise plan.
 
 ## Examples
 
@@ -248,6 +253,8 @@ async def on_update(update: TweetUpdate):
 @client.on("tweet")
 async def on_tweet(tweet: TweetContent):
     if tweet.ref:
+        from tweetstream_sdk import ReferenceType
+
         match tweet.ref.type:
             case ReferenceType.REPLY:
                 print(f"@{tweet.author.handle} replied to @{tweet.ref.author.handle}:")

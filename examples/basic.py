@@ -7,14 +7,15 @@ Run: python examples/basic.py
 import asyncio
 import os
 import signal
+from contextlib import suppress
 
 from tweetstream_sdk import (
-    TweetStreamClient,
-    TweetContent,
-    TweetMeta,
-    ProfileUpdateEvent,
     FollowEvent,
     Platform,
+    ProfileUpdateEvent,
+    TweetContent,
+    TweetMeta,
+    TweetStreamClient,
 )
 
 
@@ -82,10 +83,8 @@ async def main():
     await client.disconnect()
     connect_task.cancel()
 
-    try:
+    with suppress(asyncio.CancelledError):
         await connect_task
-    except asyncio.CancelledError:
-        pass
 
 
 if __name__ == "__main__":

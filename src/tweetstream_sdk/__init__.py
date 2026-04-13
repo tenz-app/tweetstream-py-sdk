@@ -61,14 +61,13 @@ from .types import (
     TweetAuthor,
     # Tweet types
     TweetContent,
-    TweetDelete,
     TweetMeta,
     # References
     TweetReference,
     TweetUpdate,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.0.3"
 __all__ = [
     # Clients
     "TweetStreamClient",
@@ -93,7 +92,6 @@ __all__ = [
     "TweetContent",
     "TweetMeta",
     "TweetUpdate",
-    "TweetDelete",
     "DetectedToken",
     "DetectedCexMarket",
     "DetectedPredictionMarket",

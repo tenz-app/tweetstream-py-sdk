@@ -16,6 +16,7 @@ from websockets.asyncio.client import ClientConnection
 
 from .types import (
     AccountActor,
+    CexExchange,
     DetectedCexMarket,
     DetectedEntities,
     DetectedPredictionMarket,
@@ -26,6 +27,7 @@ from .types import (
     MetaSource,
     OcrResult,
     Platform,
+    PredictionExchange,
     ProfileChanges,
     ProfileUpdateEvent,
     ReferenceType,
@@ -67,6 +69,16 @@ IMMEDIATE_RECONNECT_CODES = {CloseCode.SERVER_SHUTDOWN.value}
 
 
 EventCallback = Callable[..., Awaitable[None] | None]
+
+
+def _parse_enum(enum_cls: type[Enum], raw_value: Any) -> Enum | None:
+    if raw_value is None:
+        return None
+
+    try:
+        return enum_cls(raw_value)
+    except ValueError:
+        return None
 
 
 @dataclass
@@ -307,29 +319,21 @@ class TweetStreamClient:
             await self._emit("error", Exception(f"Failed to parse message: {e}"))
 
     def _parse_tweet_author(self, data: dict) -> TweetAuthor:
-        platform = None
-        if p := data.get("platform"):
-            platform = Platform(p) if p in Platform.__members__.values() else None
-
         return TweetAuthor(
             id=data.get("id"),
             handle=data.get("handle"),
             name=data.get("name"),
             profile_image=data.get("profileImage"),
-            platform=platform,
+            platform=_parse_enum(Platform, data.get("platform")),
         )
 
     def _parse_account_actor(self, data: dict) -> AccountActor:
-        platform = None
-        if p := data.get("platform"):
-            platform = Platform(p) if p in Platform.__members__.values() else None
-
         return AccountActor(
             id=data.get("id"),
             handle=data.get("handle"),
             name=data.get("name"),
             profile_image=data.get("profileImage"),
-            platform=platform,
+            platform=_parse_enum(Platform, data.get("platform")),
             bio=data.get("bio"),
             banner=data.get("banner"),
             location=data.get("location"),
@@ -388,7 +392,9 @@ class TweetStreamClient:
 
         cex = [
             DetectedCexMarket(
-                exchange=c.get("exchange", "binance"),
+                exchange=(
+                    _parse_enum(CexExchange, c.get("exchange")) or CexExchange.BINANCE
+                ),
                 sources=[MetaSource(s) for s in c.get("sources", [])],
                 symbol=c.get("symbol"),
                 base_asset=c.get("baseAsset"),
@@ -401,7 +407,10 @@ class TweetStreamClient:
 
         prediction = [
             DetectedPredictionMarket(
-                exchange=p.get("exchange", "polymarket"),
+                exchange=(
+                    _parse_enum(PredictionExchange, p.get("exchange"))
+                    or PredictionExchange.POLYMARKET
+                ),
                 sources=[MetaSource(s) for s in p.get("sources", [])],
                 market_id=p.get("marketId"),
                 title=p.get("title"),

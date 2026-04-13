@@ -9,15 +9,15 @@ Run: python examples/token_alerts.py
 import asyncio
 import os
 import signal
+from contextlib import suppress
 
 from tweetstream_sdk import (
-    TweetStreamClient,
+    DetectedCexMarket,
+    DetectedToken,
     TweetContent,
     TweetMeta,
-    DetectedToken,
-    DetectedCexMarket,
+    TweetStreamClient,
 )
-
 
 # Store recent tweets to correlate with metadata
 recent_tweets: dict[str, tuple[str, str]] = {}
@@ -87,10 +87,8 @@ async def main():
     await client.disconnect()
     connect_task.cancel()
 
-    try:
+    with suppress(asyncio.CancelledError):
         await connect_task
-    except asyncio.CancelledError:
-        pass
 
 
 def print_token_alert(handle: str, token: DetectedToken) -> None:

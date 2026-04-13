@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tweetstream-sdk"
-version = "1.0.2"
+version = "1.0.3"
 description = "Official Python SDK for TweetStream - Real-time Twitter/X and Truth Social streaming API"
 readme = "README.md"
 license = "MIT"
@@ -41,6 +41,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "aiohttp>=3.10",
     "websockets>=12.0",
 ]
 
