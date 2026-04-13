@@ -1,82 +1,68 @@
 # TweetStream SDK for Python
 
-Official Python SDK for [TweetStream](https://tweetstream.io) - Real-time Twitter/X and Truth Social streaming API.
+Official Python SDK for [TweetStream](https://tweetstream.io) - the real-time Twitter WebSocket API built for crypto traders.
 
 [![PyPI version](https://badge.fury.io/py/tweetstream-sdk.svg)](https://pypi.org/project/tweetstream-sdk/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-## Features
+## Why TweetStream?
 
-- **Real-time streaming** via WebSocket with automatic reconnection
-- **Full type hints** with dataclasses
-- **Tweet content** including quotes, replies, and retweets
-- **Metadata detection** for tokens, CEX markets, and prediction markets
-- **Profile updates** and follow notifications
-- **Historical data** via REST API
-- **Account management** - add/remove tracked handles
-- **Async-native** design with asyncio
+- **~200ms latency** - Get tweets before they hit your feed
+- **1M+ signals daily** - Battle-tested infrastructure
+- **Token detection** - Automatic $ticker and contract address extraction with live prices
+- **OCR built-in** - Extract text from screenshot tweets
+- **CEX & prediction markets** - Detect Binance, Bybit, Polymarket mentions
+- **No infrastructure** - Just connect and stream
+
+Perfect for trading bots, Discord alerts, sentiment analysis, and real-time portfolio tracking.
 
 ## Installation
 
 ```bash
 pip install tweetstream-sdk
+# or with uv
+uv add tweetstream-sdk
 ```
 
 ## Quick Start
 
-### Real-time Streaming
+### Real-time Tweet Streaming
 
 ```python
 import asyncio
 from tweetstream_sdk import TweetStreamClient, TweetContent, TweetMeta
 
 async def main():
-    client = TweetStreamClient(api_key="your-api-key")
+    client = TweetStreamClient(api_key="your-api-key")  # Get one at https://tweetstream.io
 
     @client.on("tweet")
     async def on_tweet(tweet: TweetContent):
         print(f"@{tweet.author.handle}: {tweet.text}")
 
-        # Check for quoted tweets
-        if tweet.ref and tweet.ref.type.value == "quote":
-            print(f"  Quoting: {tweet.ref.text}")
-
     @client.on("tweet_meta")
     async def on_meta(meta: TweetMeta):
         if meta.detected and meta.detected.tokens:
             for token in meta.detected.tokens:
-                print(f"Token detected: {token.symbol} on {token.chain}")
-
-    @client.on("profile_update")
-    async def on_profile(event):
-        print(f"@{event.actor.handle} updated their profile")
-
-    @client.on("follow")
-    async def on_follow(event):
-        print(f"@{event.actor.handle} followed @{event.target.handle}")
+                print(f"Token: {token.symbol} | Chain: {token.chain} | Price: ${token.price_usd}")
 
     @client.on("connected")
     async def on_connected():
-        print("Connected!")
-
-    @client.on("reconnecting")
-    async def on_reconnecting(attempt: int, delay: float):
-        print(f"Reconnecting in {delay:.1f}s...")
+        print("Streaming tweets...")
 
     await client.connect()
 
 asyncio.run(main())
 ```
 
-### REST API
+### REST API for Historical Data
 
 ```python
-from tweetstream_sdk import TweetStreamApi, MessageType
+from tweetstream_sdk import TweetStreamApi
 
 api = TweetStreamApi(api_key="your-api-key")
 
-# Get historical tweets
+# Fetch historical tweets for backtesting
 history = api.get_history(
     handles=["elonmusk", "VitalikButerin"],
     limit=100,
@@ -84,169 +70,193 @@ history = api.get_history(
 )
 
 for tweet in history.data:
-    print(f"{tweet.twitter_handle}: {tweet.body}")
+    print(f"@{tweet.twitter_handle}: {tweet.body}")
 
+# Manage tracked accounts
+api.add_accounts(["whale_alert", "lookonchain"])
+api.remove_accounts("old_account")
+```
+
+## Features
+
+### Real-time WebSocket Streaming
+
+- **Tweet content** - Full tweet with author, media, timestamps
+- **Quotes, replies, retweets** - Complete reference chain
+- **Truth Social** - Stream from both Twitter/X and Truth Social
+- **Profile updates** - Name, bio, avatar changes
+- **Follow notifications** - Know when tracked accounts follow others
+- **Auto-reconnect** - Built-in exponential backoff
+
+### Metadata Detection
+
+Every tweet is enriched with:
+
+```python
+@client.on("tweet_meta")
+async def on_meta(meta: TweetMeta):
+    if not meta.detected:
+        return
+
+    # Crypto tokens with live prices
+    for token in meta.detected.tokens:
+        print(f"{token.symbol} on {token.chain}: ${token.price_usd}")
+        print(f"Contract: {token.contract}")
+
+    # CEX trading pairs
+    for market in meta.detected.cex:
+        print(f"{market.exchange.value}: {market.symbol} @ ${market.price_usd}")
+
+    # Prediction markets (Polymarket, Kalshi)
+    for market in meta.detected.prediction:
+        print(f"{market.exchange.value}: {market.title}")
+
+    # OCR from images
+    if meta.ocr:
+        print(f"Image text: {meta.ocr.text}")
+```
+
+### Account Management API
+
+```python
 # Add accounts to track
-added = api.add_accounts(["newhandle1", "newhandle2"])
-print(f"Added {added.summary.succeeded} accounts")
+result = api.add_accounts(["trader1", "trader2", "trader3"])
+print(f"Added {result.summary.succeeded} of {result.summary.total}")
 
 # Remove accounts
-removed = api.remove_accounts("oldhandle")
-print(f"Removed {removed.summary.succeeded} accounts")
+api.remove_accounts("old_account")
+
+# Get historical data with filters
+from tweetstream_sdk import MessageType
+
+tweets = api.get_history(
+    handles=["specific_trader"],
+    message_type=MessageType.TWEET,  # or PROFILE, FOLLOW
+    start_date="2024-01-01T00:00:00Z",
+    end_date="2024-01-31T23:59:59Z",
+    limit=500,
+)
 ```
 
 ## Examples
 
-### Token Alert Bot
+### Trading Bot Alert
 
 ```python
 import asyncio
-from tweetstream_sdk import TweetStreamClient, TweetMeta
+from tweetstream_sdk import TweetStreamClient, TweetContent, TweetMeta
 
 async def main():
     client = TweetStreamClient(api_key="your-api-key")
+    recent_tweets: dict[str, TweetContent] = {}
+
+    @client.on("tweet")
+    async def on_tweet(tweet: TweetContent):
+        recent_tweets[tweet.tweet_id] = tweet
 
     @client.on("tweet_meta")
     async def on_meta(meta: TweetMeta):
-        if not meta.detected:
+        if not meta.detected or not meta.detected.tokens:
             return
 
-        # Alert on new token mentions
+        tweet = recent_tweets.get(meta.tweet_id)
         for token in meta.detected.tokens:
-            if token.chain == "solana" and token.price_usd:
-                print(f"[SOLANA] {token.symbol}: ${token.price_usd:.6f}")
-
-        # Alert on CEX listings
-        for market in meta.detected.cex:
-            print(f"[{market.exchange.value.upper()}] {market.symbol}")
+            if token.chain == "solana":
+                print(f"[ALERT] @{tweet.author.handle if tweet else 'unknown'} mentioned {token.symbol}")
+                print(f"  Contract: {token.contract}")
+                print(f"  Price: ${token.price_usd}")
+                # Send to your trading bot...
 
     await client.connect()
 
 asyncio.run(main())
 ```
 
-### Truth Social Monitor
+### Discord Webhook Integration
 
 ```python
 import asyncio
-from tweetstream_sdk import TweetStreamClient, TweetContent, Platform
+import aiohttp
+from tweetstream_sdk import TweetStreamClient, TweetContent
+
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/..."
 
 async def main():
     client = TweetStreamClient(api_key="your-api-key")
 
     @client.on("tweet")
     async def on_tweet(tweet: TweetContent):
-        if tweet.author.platform == Platform.TRUTH_SOCIAL:
-            print(f"[Truth Social] @{tweet.author.handle}: {tweet.text}")
+        async with aiohttp.ClientSession() as session:
+            await session.post(DISCORD_WEBHOOK, json={
+                "content": f"**@{tweet.author.handle}**: {tweet.text}\n{tweet.link}"
+            })
 
     await client.connect()
 
 asyncio.run(main())
 ```
 
-### Profile Change Tracker
+### Profile Change Monitor
 
 ```python
-import asyncio
-from tweetstream_sdk import TweetStreamClient, ProfileUpdateEvent
-
-async def main():
-    client = TweetStreamClient(api_key="your-api-key")
-
-    @client.on("profile_update")
-    async def on_profile(event: ProfileUpdateEvent):
-        changes = []
-
-        if event.changes.name:
-            changes.append(f'name: "{event.changes.name}"')
-        if event.changes.bio:
-            changes.append(f'bio: "{event.changes.bio}"')
-        if event.changes.avatar:
-            changes.append("avatar updated")
-        if event.changes.handle and event.previous:
-            changes.append(
-                f"handle: @{event.previous.handle} -> @{event.changes.handle}"
-            )
-
-        print(f"@{event.actor.handle} changed: {', '.join(changes)}")
-
-    await client.connect()
-
-asyncio.run(main())
+@client.on("profile_update")
+async def on_profile(event: ProfileUpdateEvent):
+    print(f"@{event.actor.handle} updated their profile:")
+    if event.changes.name:
+        print(f"  Name: {event.changes.name}")
+    if event.changes.bio:
+        print(f"  Bio: {event.changes.bio}")
+    if event.changes.handle and event.previous:
+        print(f"  Handle: @{event.previous.handle} -> @{event.changes.handle}")
 ```
 
 ## API Reference
 
 ### TweetStreamClient
 
-#### Constructor Arguments
-
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `api_key` | `str` | *required* | Your TweetStream API key |
+| `api_key` | `str` | required | Your TweetStream API key |
 | `base_url` | `str` | `wss://ws.tweetstream.io/ws` | WebSocket endpoint |
 | `auto_reconnect` | `bool` | `True` | Auto-reconnect on disconnect |
-| `max_reconnect_attempts` | `int \| None` | `None` | Max reconnection attempts (None = unlimited) |
-| `reconnect_delay` | `float` | `1.0` | Initial reconnect delay in seconds |
-| `max_reconnect_delay` | `float` | `30.0` | Max reconnect delay in seconds |
+| `max_reconnect_attempts` | `int \| None` | `None` | Max attempts (None = unlimited) |
 
-#### Events
+### Events
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `connected` | - | Connected to WebSocket |
-| `disconnected` | `(code: int, reason: str)` | Disconnected from WebSocket |
-| `error` | `Exception` | Connection or parse error |
-| `message` | `Envelope` | Raw message envelope |
-| `tweet` | `TweetContent` | New tweet |
-| `tweet_meta` | `TweetMeta` | Tweet metadata (tokens, etc.) |
-| `tweet_update` | `TweetUpdate` | Tweet updated |
-| `tweet_delete` | `TweetDelete` | Tweet deleted |
+| `tweet` | `TweetContent` | New tweet received |
+| `tweet_meta` | `TweetMeta` | Token/CEX/prediction detection |
 | `profile_update` | `ProfileUpdateEvent` | Profile changed |
-| `follow` | `FollowEvent` | Follow event |
-| `reconnecting` | `(attempt: int, delay: float)` | Reconnecting |
+| `follow` | `FollowEvent` | Follow event detected |
+| `connected` | - | WebSocket connected |
+| `disconnected` | `(code, reason)` | WebSocket disconnected |
+| `reconnecting` | `(attempt, delay)` | Attempting reconnection |
 
 ### TweetStreamApi
 
-#### Methods
+| Method | Description |
+|--------|-------------|
+| `get_history(...)` | Fetch historical tweets/events |
+| `add_accounts(handles)` | Add accounts to track |
+| `remove_accounts(handles)` | Remove tracked accounts |
 
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `get_history` | See below | `HistoryResponse` | Fetch historical data |
-| `add_accounts` | `accounts: str \| list[str]` | `HandleResponse` | Add accounts to track |
-| `remove_accounts` | `accounts: str \| list[str]` | `HandleResponse` | Remove tracked accounts |
+## Get Started
 
-#### get_history Parameters
+1. **Sign up** at [tweetstream.io](https://tweetstream.io) (7-day free trial)
+2. **Get your API key** from the dashboard
+3. **Install the SDK** and start streaming
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `handles` | `str \| list[str] \| None` | Filter by handles |
-| `limit` | `int \| None` | Max results (default: 100, max: 1000) |
-| `start_date` | `str \| None` | ISO 8601 start date |
-| `end_date` | `str \| None` | ISO 8601 end date |
-| `message_type` | `MessageType \| None` | Filter by type (TWEET, PROFILE, FOLLOW) |
-
-## Types
-
-All types are exported as dataclasses with full type hints:
-
-```python
-from tweetstream_sdk import (
-    TweetContent,
-    TweetMeta,
-    DetectedToken,
-    ProfileUpdateEvent,
-    FollowEvent,
-    # ... and more
-)
+```bash
+pip install tweetstream-sdk
 ```
 
 ## Links
 
-- [TweetStream](https://tweetstream.io) - Get your API key
-- [Documentation](https://tweetstream.io/docs)
-- [TypeScript SDK](https://github.com/tenz-app/tweetstream-ts-sdk)
+- [TweetStream](https://tweetstream.io) - Sign up and get your API key
+- [Documentation](https://tweetstream.io/docs) - Full API docs
+- [TypeScript SDK](https://github.com/tenz-app/tweetstream-ts-sdk) - TypeScript/JavaScript version
 
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) for details.
