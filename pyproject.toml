@@ -52,8 +52,8 @@ dev = [
 [project.urls]
 Homepage = "https://tweetstream.io"
 Documentation = "https://tweetstream.io/docs"
-Repository = "https://github.com/tenz/tweetstream-py-sdk"
-Issues = "https://github.com/tenz/tweetstream-py-sdk/issues"
+Repository = "https://github.com/tenz-app/tweetstream-py-sdk"
+Issues = "https://github.com/tenz-app/tweetstream-py-sdk/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tweetstream_sdk"]

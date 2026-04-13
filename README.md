@@ -245,7 +245,7 @@ from tweetstream_sdk import (
 
 - [TweetStream](https://tweetstream.io) - Get your API key
 - [Documentation](https://tweetstream.io/docs)
-- [TypeScript SDK](https://github.com/tenz/tweetstream-ts-sdk)
+- [TypeScript SDK](https://github.com/tenz-app/tweetstream-ts-sdk)
 
 ## License
 
