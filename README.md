@@ -226,18 +226,20 @@ async def on_follow(event: FollowEvent):
     print(f"  Now following: {event.target.name}")
 ```
 
-### Tweet Edit Tracking
+### Tweet Enrichment Updates
 
 ```python
 from tweetstream_sdk import TweetUpdate
 
+# Fired when additional data becomes available for a tweet
+# (e.g., thread context, media URLs, reference details)
 @client.on("tweet_update")
 async def on_update(update: TweetUpdate):
-    print(f"Tweet {update.tweet_id} was edited:")
-    if update.text:
-        print(f"  New text: {update.text}")
+    print(f"Tweet {update.tweet_id} enriched with new data:")
+    if update.ref:
+        print(f"  Thread context: {update.ref.type} to {update.ref.tweet_id}")
     if update.media:
-        print(f"  Media updated: {len(update.media)} items")
+        print(f"  Media resolved: {len(update.media)} items")
 ```
 
 ### Handling Quotes, Replies, and Retweets
@@ -287,7 +289,7 @@ async def on_tweet(tweet: TweetContent):
 |-------|---------|-------------|
 | `tweet` | `TweetContent` | New tweet (includes replies, quotes, retweets) |
 | `tweet_meta` | `TweetMeta` | Token/CEX/prediction market detection, OCR |
-| `tweet_update` | `TweetUpdate` | Tweet was edited |
+| `tweet_update` | `TweetUpdate` | Additional tweet data available (enrichment) |
 | `profile_update` | `ProfileUpdateEvent` | Profile name/bio/avatar changed |
 | `follow` | `FollowEvent` | Account followed another account |
 | `connected` | - | WebSocket connected |
