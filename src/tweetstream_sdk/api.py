@@ -6,9 +6,9 @@ Historical data and account management
 import json
 from dataclasses import dataclass
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 
 from .types import (
     HandleOperationResult,
@@ -170,9 +170,7 @@ class TweetStreamApi:
         data = self._request("DELETE", url, body)
         return self._parse_handle_response(data)
 
-    def _request(
-        self, method: str, url: str, body: dict | None = None
-    ) -> dict:
+    def _request(self, method: str, url: str, body: dict | None = None) -> dict:
         """Make an HTTP request."""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
