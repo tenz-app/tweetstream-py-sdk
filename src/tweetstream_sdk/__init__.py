@@ -59,15 +59,22 @@ from .types import (
     ReferenceType,
     # Authors
     TweetAuthor,
+    TweetAuthorMetrics,
     # Tweet types
     TweetContent,
+    TweetDelete,
+    TweetMention,
     TweetMeta,
     # References
     TweetReference,
     TweetUpdate,
+    TweetUrl,
+    TweetVerifiedLabel,
+    TwitterHandlesResult,
+    VerifiedType,
 )
 
-__version__ = "1.0.3"
+__version__ = "1.1.0"
 __all__ = [
     # Clients
     "TweetStreamClient",
@@ -77,19 +84,25 @@ __all__ = [
     "MessageType",
     "Platform",
     "ReferenceType",
+    "VerifiedType",
     "MetaSource",
     "CexExchange",
     "PredictionExchange",
     "HandleOperationState",
     # Media
     "Media",
+    "TweetMention",
+    "TweetUrl",
     # Authors
     "TweetAuthor",
+    "TweetAuthorMetrics",
+    "TweetVerifiedLabel",
     "AccountActor",
     # References
     "TweetReference",
     # Tweet types
     "TweetContent",
+    "TweetDelete",
     "TweetMeta",
     "TweetUpdate",
     "DetectedToken",
@@ -103,6 +116,7 @@ __all__ = [
     "FollowEvent",
     # Envelope
     "Envelope",
+    "TwitterHandlesResult",
     # REST API types
     "HistoricalTweet",
     "HistoryMetadata",

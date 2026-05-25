@@ -85,8 +85,9 @@ api.remove_accounts("old_account")
 ### Real-time WebSocket Streaming
 
 - **Tweet content** - Full tweet with author, media, timestamps
+- **Entities** - Expanded URLs and mentions when available
 - **Quotes, replies, retweets** - Complete reference chain
-- **Truth Social** - Stream from both Twitter/X and Truth Social
+- **Truth Social** - Optional Trump Truth Social posts use the same content shape with `author.platform == Platform.TRUTH_SOCIAL`
 - **Profile updates** - Name, bio, avatar changes
 - **Follow notifications** - Know when tracked accounts follow others
 - **Auto-reconnect** - Built-in exponential backoff
@@ -234,17 +235,21 @@ async def on_follow(event: FollowEvent):
 ### Tweet Enrichment Updates
 
 ```python
-from tweetstream_sdk import TweetUpdate
+from tweetstream_sdk import Platform, TweetUpdate
 
 # Fired when additional data becomes available for a tweet
 # (e.g., thread context, media URLs, reference details)
 @client.on("tweet_update")
 async def on_update(update: TweetUpdate):
     print(f"Tweet {update.tweet_id} enriched with new data:")
+    if update.author and update.author.platform == Platform.TRUTH_SOCIAL:
+        print("  Truth Social post update")
     if update.ref:
         print(f"  Thread context: {update.ref.type} to {update.ref.tweet_id}")
     if update.media:
         print(f"  Media resolved: {len(update.media)} items")
+    if update.urls:
+        print(f"  URLs resolved: {', '.join(url.url for url in update.urls)}")
 ```
 
 ### Handling Quotes, Replies, and Retweets
@@ -277,6 +282,8 @@ from tweetstream_sdk import Platform
 async def on_tweet(tweet: TweetContent):
     platform = "Truth Social" if tweet.author.platform == Platform.TRUTH_SOCIAL else "Twitter/X"
     print(f"[{platform}] @{tweet.author.handle}: {tweet.text}")
+    if tweet.author.platform == Platform.TRUTH_SOCIAL:
+        print("Route optional Trump Truth Social posts separately here.")
 ```
 
 ## API Reference
@@ -297,14 +304,18 @@ async def on_tweet(tweet: TweetContent):
 | `tweet` | `TweetContent` | New tweet (includes replies, quotes, retweets) |
 | `tweet_meta` | `TweetMeta` | Token/CEX/prediction market detection, OCR |
 | `tweet_update` | `TweetUpdate` | Additional tweet data available (enrichment) |
+| `tweet_delete` | `TweetDelete` | Tweet deletion signal when provided by an upstream |
 | `profile_update` | `ProfileUpdateEvent` | Profile name/bio/avatar changed |
 | `follow` | `FollowEvent` | Account followed another account |
+| `twitter_handles_result` | `TwitterHandlesResult` | WebSocket handle-management result |
 | `connected` | - | WebSocket connected |
 | `disconnected` | `(code, reason)` | WebSocket disconnected |
 | `reconnecting` | `(attempt, delay)` | Attempting reconnection |
 | `message` | `Envelope` | Raw envelope (for advanced use) |
 
 ### TweetStreamApi
+
+REST requests default to `https://api.tweetstream.io` and use `Authorization: Bearer <API_KEY>`.
 
 | Method | Description |
 |--------|-------------|

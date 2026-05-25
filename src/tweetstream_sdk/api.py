@@ -10,9 +10,14 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from .parsing import (
+    parse_follow_event,
+    parse_handle_operation_result,
+    parse_profile_update,
+    parse_tweet_content,
+    parse_tweet_meta,
+)
 from .types import (
-    HandleOperationResult,
-    HandleOperationState,
     HandleResponse,
     HandleSummary,
     HistoricalTweet,
@@ -21,7 +26,7 @@ from .types import (
     MessageType,
 )
 
-DEFAULT_API_URL = "https://tweetstream.io"
+DEFAULT_API_URL = "https://api.tweetstream.io"
 
 
 class TweetStreamApiError(Exception):
@@ -216,9 +221,15 @@ class TweetStreamApi:
 
     def _parse_historical_tweet(self, data: dict) -> HistoricalTweet:
         """Parse a historical tweet from API response."""
-        # Content is already parsed by server, just wrap it
-        content = data.get("content", {})
-        meta = data.get("meta")
+        message_type = MessageType(data.get("messageType", "TWEET"))
+        raw_content = data.get("content", {})
+
+        if message_type == MessageType.PROFILE:
+            content = parse_profile_update(raw_content)
+        elif message_type == MessageType.FOLLOW:
+            content = parse_follow_event(raw_content)
+        else:
+            content = parse_tweet_content(raw_content)
 
         return HistoricalTweet(
             tweet_id=data.get("tweetId", ""),
@@ -228,9 +239,9 @@ class TweetStreamApi:
             link=data.get("link", ""),
             time=data.get("time", ""),
             received_time=data.get("receivedTime", ""),
-            message_type=MessageType(data.get("messageType", "TWEET")),
-            content=content,  # type: ignore - simplified for API
-            meta=meta,  # type: ignore - simplified for API
+            message_type=message_type,
+            content=content,
+            meta=parse_tweet_meta(data.get("meta")),
         )
 
     def _parse_handle_response(self, data: dict) -> HandleResponse:
@@ -241,19 +252,7 @@ class TweetStreamApi:
             action=data.get("action", "follow"),
             request_id=data.get("requestId"),
             error=data.get("error"),
-            results=[
-                HandleOperationResult(
-                    input=r.get("input", ""),
-                    state=HandleOperationState(r.get("state", "failed")),
-                    handle=r.get("handle"),
-                    normalized_handle=r.get("normalizedHandle"),
-                    name=r.get("name"),
-                    profile_image=r.get("profileImage"),
-                    twitter_id=r.get("twitterId"),
-                    message=r.get("message"),
-                )
-                for r in data.get("results", [])
-            ],
+            results=[parse_handle_operation_result(r) for r in data.get("results", [])],
             summary=HandleSummary(
                 total=summary.get("total", 0),
                 succeeded=summary.get("succeeded", 0),

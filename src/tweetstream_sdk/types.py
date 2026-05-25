@@ -3,6 +3,8 @@ TweetStream SDK Types
 Real-time Twitter/X and Truth Social streaming API
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal, TypeAlias
@@ -56,6 +58,7 @@ MessageOperation: TypeAlias = Literal[
     "content",
     "meta",
     "update",
+    "delete",
     "profile_update",
     "follow",
     "auth_ping",
@@ -65,6 +68,7 @@ MessageOperation: TypeAlias = Literal[
 
 EnvelopeType: TypeAlias = Literal["tweet", "account", "control"]
 MediaType: TypeAlias = Literal["image", "video", "gif"]
+VerifiedType: TypeAlias = Literal["blue", "business", "government", "none"]
 
 
 @dataclass
@@ -75,12 +79,49 @@ class Media:
 
 
 @dataclass
+class TweetUrl:
+    url: str
+    name: str | None = None
+    tco: str | None = None
+
+
+@dataclass
+class TweetMention:
+    handle: str | None = None
+    id: str | None = None
+    name: str | None = None
+
+
+@dataclass
+class TweetAuthorMetrics:
+    likes: int | None = None
+    tweets: int | None = None
+
+
+@dataclass
+class TweetVerifiedLabel:
+    badge: str | None
+    description: str
+    url: str | None
+
+
+@dataclass
 class TweetAuthor:
     id: str | None = None
     handle: str | None = None
     name: str | None = None
     profile_image: str | None = None
     platform: Platform | None = None
+    banner: str | None = None
+    bio: str | None = None
+    followers_count: int | None = None
+    following_count: int | None = None
+    joined_at: int | None = None
+    location: str | None = None
+    metrics: TweetAuthorMetrics | None = None
+    url: str | None = None
+    verified_label: TweetVerifiedLabel | None = None
+    verified_type: VerifiedType | None = None
 
 
 @dataclass
@@ -97,7 +138,10 @@ class AccountActor:
     website_url: str | None = None
     followers_count: int | None = None
     following_count: int | None = None
-    verified_type: str | None = None
+    joined_at: int | None = None
+    metrics: TweetAuthorMetrics | None = None
+    verified_label: TweetVerifiedLabel | None = None
+    verified_type: VerifiedType | None = None
 
 
 @dataclass
@@ -118,6 +162,8 @@ class TweetContent:
     link: str | None = None
     media: list[Media] = field(default_factory=list)
     ref: TweetReference | None = None
+    mentions: list[TweetMention] = field(default_factory=list)
+    urls: list[TweetUrl] = field(default_factory=list)
 
 
 @dataclass
@@ -177,6 +223,14 @@ class TweetUpdate:
     text: str | None = None
     media: list[Media] = field(default_factory=list)
     ref: TweetReference | None = None
+    author: TweetAuthor | None = None
+    mentions: list[TweetMention] = field(default_factory=list)
+    urls: list[TweetUrl] = field(default_factory=list)
+
+
+@dataclass
+class TweetDelete:
+    tweet_id: str
 
 
 @dataclass
@@ -216,6 +270,14 @@ class Envelope:
     ts: int
     d: dict
     id: str | None = None
+
+
+@dataclass
+class TwitterHandlesResult:
+    action: Literal["follow", "unfollow"]
+    request_id: str | None
+    error: str | None
+    results: list[HandleOperationResult]
 
 
 # REST API types

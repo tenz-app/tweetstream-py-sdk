@@ -14,28 +14,26 @@ from typing import Any
 import websockets
 from websockets.asyncio.client import ClientConnection
 
+from .parsing import (
+    parse_detected_entities,
+    parse_follow_event,
+    parse_profile_update,
+    parse_tweet_content,
+    parse_tweet_delete,
+    parse_tweet_meta,
+    parse_tweet_update,
+    parse_twitter_handles_result,
+)
 from .types import (
-    AccountActor,
-    CexExchange,
-    DetectedCexMarket,
     DetectedEntities,
-    DetectedPredictionMarket,
-    DetectedToken,
     Envelope,
     FollowEvent,
-    Media,
-    MetaSource,
-    OcrResult,
-    Platform,
-    PredictionExchange,
-    ProfileChanges,
     ProfileUpdateEvent,
-    ReferenceType,
-    TweetAuthor,
     TweetContent,
+    TweetDelete,
     TweetMeta,
-    TweetReference,
     TweetUpdate,
+    TwitterHandlesResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +54,8 @@ class CloseCode(Enum):
     CONNECTION_LIMIT = 4029
 
 
+NO_RECONNECT_HTTP_STATUSES = {400, 401, 403, 429}
+
 # Close codes that should not trigger reconnection
 NO_RECONNECT_CODES = {
     CloseCode.NORMAL.value,
@@ -71,14 +71,17 @@ IMMEDIATE_RECONNECT_CODES = {CloseCode.SERVER_SHUTDOWN.value}
 EventCallback = Callable[..., Awaitable[None] | None]
 
 
-def _parse_enum(enum_cls: type[Enum], raw_value: Any) -> Enum | None:
-    if raw_value is None:
-        return None
+def _extract_http_status(error: Exception) -> int | None:
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
 
-    try:
-        return enum_cls(raw_value)
-    except ValueError:
-        return None
+    response = getattr(error, "response", None)
+    response_status = getattr(response, "status_code", None)
+    if isinstance(response_status, int):
+        return response_status
+
+    return None
 
 
 @dataclass
@@ -155,8 +158,10 @@ class TweetStreamClient:
             - tweet: New tweet (content: TweetContent)
             - tweet_meta: Tweet metadata (meta: TweetMeta)
             - tweet_update: Tweet updated (update: TweetUpdate)
+            - tweet_delete: Tweet deleted (deleted: TweetDelete)
             - profile_update: Profile changed (event: ProfileUpdateEvent)
             - follow: Follow event (event: FollowEvent)
+            - twitter_handles_result: Handle-management result (result: TwitterHandlesResult)
             - reconnecting: Reconnecting (attempt: int, delay: float)
 
         Example:
@@ -215,6 +220,10 @@ class TweetStreamClient:
                 await self._connect_once()
             except Exception as e:
                 await self._emit("error", e)
+                http_status = _extract_http_status(e)
+                if http_status in NO_RECONNECT_HTTP_STATUSES:
+                    self._should_reconnect = False
+                    break
                 if not self._should_reconnect:
                     break
                 await self._handle_reconnect(1006)
@@ -308,173 +317,45 @@ class TweetStreamClient:
                 case "update":
                     update = self._parse_tweet_update(payload)
                     await self._emit("tweet_update", update)
+                case "delete":
+                    deleted = self._parse_tweet_delete(payload)
+                    await self._emit("tweet_delete", deleted)
                 case "profile_update":
                     event = self._parse_profile_update(payload)
                     await self._emit("profile_update", event)
                 case "follow":
                     event = self._parse_follow_event(payload)
                     await self._emit("follow", event)
+                case "twitter_handles_result":
+                    result = self._parse_twitter_handles_result(payload)
+                    await self._emit("twitter_handles_result", result)
 
         except Exception as e:
             await self._emit("error", Exception(f"Failed to parse message: {e}"))
 
-    def _parse_tweet_author(self, data: dict) -> TweetAuthor:
-        return TweetAuthor(
-            id=data.get("id"),
-            handle=data.get("handle"),
-            name=data.get("name"),
-            profile_image=data.get("profileImage"),
-            platform=_parse_enum(Platform, data.get("platform")),
-        )
-
-    def _parse_account_actor(self, data: dict) -> AccountActor:
-        return AccountActor(
-            id=data.get("id"),
-            handle=data.get("handle"),
-            name=data.get("name"),
-            profile_image=data.get("profileImage"),
-            platform=_parse_enum(Platform, data.get("platform")),
-            bio=data.get("bio"),
-            banner=data.get("banner"),
-            location=data.get("location"),
-            url=data.get("url"),
-            website_url=data.get("websiteUrl"),
-            followers_count=data.get("followersCount"),
-            following_count=data.get("followingCount"),
-            verified_type=data.get("verifiedType"),
-        )
-
-    def _parse_media(self, data: list) -> list[Media]:
-        return [
-            Media(
-                url=m.get("url", ""),
-                type=m.get("type"),
-                thumbnail=m.get("thumbnail"),
-            )
-            for m in data
-        ]
-
-    def _parse_reference(self, data: dict) -> TweetReference:
-        return TweetReference(
-            type=ReferenceType(data.get("type", "reply")),
-            tweet_id=data.get("tweetId"),
-            text=data.get("text"),
-            author=self._parse_tweet_author(data.get("author", {}))
-            if data.get("author")
-            else None,
-            media=self._parse_media(data.get("media", [])),
-        )
-
     def _parse_tweet_content(self, data: dict) -> TweetContent:
-        return TweetContent(
-            tweet_id=data.get("tweetId", ""),
-            text=data.get("text", ""),
-            created_at=data.get("createdAt", 0),
-            author=self._parse_tweet_author(data.get("author", {})),
-            link=data.get("link"),
-            media=self._parse_media(data.get("media", [])),
-            ref=self._parse_reference(data["ref"]) if data.get("ref") else None,
-        )
+        return parse_tweet_content(data)
 
     def _parse_detected_entities(self, data: dict) -> DetectedEntities:
-        tokens = [
-            DetectedToken(
-                sources=[MetaSource(s) for s in t.get("sources", [])],
-                symbol=t.get("symbol"),
-                name=t.get("name"),
-                contract=t.get("contract"),
-                chain=t.get("chain"),
-                network_id=t.get("networkId"),
-                price_usd=t.get("priceUsd"),
-            )
-            for t in data.get("tokens", [])
-        ]
+        return parse_detected_entities(data)
 
-        cex = [
-            DetectedCexMarket(
-                exchange=(
-                    _parse_enum(CexExchange, c.get("exchange")) or CexExchange.BINANCE
-                ),
-                sources=[MetaSource(s) for s in c.get("sources", [])],
-                symbol=c.get("symbol"),
-                base_asset=c.get("baseAsset"),
-                quote_asset=c.get("quoteAsset"),
-                price_usd=c.get("priceUsd"),
-                url=c.get("url"),
-            )
-            for c in data.get("cex", [])
-        ]
-
-        prediction = [
-            DetectedPredictionMarket(
-                exchange=(
-                    _parse_enum(PredictionExchange, p.get("exchange"))
-                    or PredictionExchange.POLYMARKET
-                ),
-                sources=[MetaSource(s) for s in p.get("sources", [])],
-                market_id=p.get("marketId"),
-                title=p.get("title"),
-                price_usd=p.get("priceUsd"),
-                url=p.get("url"),
-            )
-            for p in data.get("prediction", [])
-        ]
-
-        return DetectedEntities(tokens=tokens, cex=cex, prediction=prediction)
-
-    def _parse_tweet_meta(self, data: dict) -> TweetMeta:
-        detected = None
-        if d := data.get("detected"):
-            detected = self._parse_detected_entities(d)
-
-        ocr = None
-        if o := data.get("ocr"):
-            ocr = OcrResult(text=o.get("text", ""))
-
-        return TweetMeta(
-            tweet_id=data.get("tweetId", ""),
-            detected=detected,
-            ocr=ocr,
-        )
+    def _parse_tweet_meta(self, data: dict | None) -> TweetMeta | None:
+        return parse_tweet_meta(data)
 
     def _parse_tweet_update(self, data: dict) -> TweetUpdate:
-        return TweetUpdate(
-            tweet_id=data.get("tweetId", ""),
-            text=data.get("text"),
-            media=self._parse_media(data.get("media", [])),
-            ref=self._parse_reference(data["ref"]) if data.get("ref") else None,
-        )
+        return parse_tweet_update(data)
 
-    def _parse_profile_changes(self, data: dict) -> ProfileChanges:
-        return ProfileChanges(
-            name=data.get("name"),
-            handle=data.get("handle"),
-            bio=data.get("bio"),
-            avatar=data.get("avatar"),
-            banner=data.get("banner"),
-            location=data.get("location"),
-        )
+    def _parse_tweet_delete(self, data: dict) -> TweetDelete:
+        return parse_tweet_delete(data)
 
     def _parse_profile_update(self, data: dict) -> ProfileUpdateEvent:
-        return ProfileUpdateEvent(
-            kind="PROFILE",
-            event_id=data.get("eventId", ""),
-            observed_at=data.get("observedAt", 0),
-            actor=self._parse_account_actor(data.get("actor", {})),
-            changes=self._parse_profile_changes(data.get("changes", {})),
-            previous=self._parse_profile_changes(data["previous"])
-            if data.get("previous")
-            else None,
-        )
+        return parse_profile_update(data)
 
     def _parse_follow_event(self, data: dict) -> FollowEvent:
-        return FollowEvent(
-            kind="FOLLOW",
-            event_id=data.get("eventId", ""),
-            observed_at=data.get("observedAt", 0),
-            actor=self._parse_account_actor(data.get("actor", {})),
-            target=self._parse_account_actor(data.get("target", {})),
-        )
+        return parse_follow_event(data)
+
+    def _parse_twitter_handles_result(self, data: dict) -> TwitterHandlesResult:
+        return parse_twitter_handles_result(data)
 
     async def disconnect(self) -> None:
         """Disconnect from the WebSocket."""

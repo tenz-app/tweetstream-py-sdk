@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tweetstream-sdk"
-version = "1.0.3"
+version = "1.1.0"
 description = "Official Python SDK for TweetStream - Real-time Twitter/X and Truth Social streaming API"
 readme = "README.md"
 license = "MIT"
